@@ -1,0 +1,39 @@
+# CI of this repository.
+#
+# The title job calls the reusable title check from the same commit, so a change
+# to that workflow is exercised by the pull request that makes it. The scripts
+# job runs the inline scripts of the reusable workflows against known inputs,
+# including the inputs that must fail.
+
+name: CI
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: Pull request title
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/conventional-pr-title.yml
+
+  scripts:
+    name: Workflow scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run the tests of the workflow scripts
+        shell: pwsh
+        run: ./tests/Test-WorkflowScripts.ps1

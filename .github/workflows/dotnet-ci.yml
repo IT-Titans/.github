@@ -1,0 +1,306 @@
+# Reusable workflow: restore, build and test a .NET solution in Release, merge
+# the coverage reports of all test projects and enforce a minimum line rate for
+# the total and for every assembly.
+#
+# The conditions of the measurement are part of the figure:
+#
+# - Release. Debug and Release produce different sequence points, so a figure
+#   measured in Debug does not compare with this one.
+# - One merged report. Each test project writes its own Cobertura file, and the
+#   files overlap. A line counts as covered when any test project reaches it.
+#   ReportGenerator unions the hits; reading one file per assembly undercounts.
+# - Total and every assembly. A total alone stays green while one assembly
+#   decays: a total of 93.9 % has hidden an assembly at 68.5 %.
+# - Compiler-generated code stays in. Excluding CompilerGeneratedAttribute drops
+#   every async state machine and raises the figure without a single new test.
+#   The workflow rejects a runsettings file that does so.
+#
+# Every script takes its inputs from environment variables. No input is written
+# into script text.
+
+name: .NET CI
+
+on:
+  workflow_call:
+    inputs:
+      solution:
+        description: >-
+          Path to the solution file, relative to the repository root. Leave empty
+          when the root contains exactly one solution.
+        required: false
+        type: string
+        default: ''
+      runsettings:
+        description: >-
+          Path to the runsettings file that configures the coverage collector.
+          Leave empty to measure with the defaults of the collector.
+        required: false
+        type: string
+        default: ''
+      minimum-line-coverage:
+        description: >-
+          Required line rate in percent, for the total and for every assembly.
+        required: false
+        type: number
+        default: 90
+      required-assemblies:
+        description: >-
+          Names of the assemblies that must appear in the merged report,
+          separated by spaces, commas or line breaks. An assembly that no test
+          project loads is missing from the report and would otherwise escape
+          the check. List every production assembly that contains executable
+          code, UI projects included. Leave out assemblies that consist of
+          interfaces only: they have no lines to measure and never appear.
+        required: false
+        type: string
+        default: ''
+      runs-on:
+        description: >-
+          Label of the runner. Use windows-latest for WPF or Windows Forms.
+        required: false
+        type: string
+        default: ubuntu-latest
+      dotnet-version:
+        description: >-
+          SDK version for actions/setup-dotnet. Leave empty to use global.json at
+          the repository root, which is the expected setup.
+        required: false
+        type: string
+        default: ''
+      fetch-depth:
+        description: >-
+          Number of commits to fetch. 0 fetches the whole history, which version
+          tools such as Nerdbank.GitVersioning need.
+        required: false
+        type: number
+        default: 1
+      verify-format:
+        description: >-
+          Run "dotnet format --verify-no-changes" before the build.
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  # Pinned, because a new major version of the tool may change how reports are
+  # merged, and the figure must not move without a change in this file.
+  REPORTGENERATOR_VERSION: '5.6.0'
+
+jobs:
+  build-test:
+    name: Build, test and coverage
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      SOLUTION: ${{ inputs.solution }}
+      RUNSETTINGS: ${{ inputs.runsettings }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch-depth }}
+          persist-credentials: false
+
+      - name: Check the toolchain pin
+        env:
+          DOTNET_VERSION_INPUT: ${{ inputs.dotnet-version }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+
+          if (-not $env:DOTNET_VERSION_INPUT -and -not (Test-Path -LiteralPath 'global.json' -PathType Leaf)) {
+              Write-Host '::error::No global.json at the repository root and no dotnet-version input. Pin the SDK in global.json.'
+              exit 1
+          }
+
+          Write-Host 'The SDK version is pinned.'
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Check the coverage settings
+        if: inputs.runsettings != ''
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+
+          if (-not (Test-Path -LiteralPath $env:RUNSETTINGS -PathType Leaf)) {
+              Write-Host "::error::The runsettings file $env:RUNSETTINGS does not exist."
+              exit 1
+          }
+
+          [xml] $settings = Get-Content -LiteralPath $env:RUNSETTINGS -Raw
+          $excluded = @($settings.SelectNodes('//ExcludeByAttribute') | ForEach-Object { $_.InnerText })
+
+          if ($excluded -match 'CompilerGenerated') {
+              Write-Host "::error file=$env:RUNSETTINGS::ExcludeByAttribute lists CompilerGeneratedAttribute. That drops every async state machine from the measurement. Remove it."
+              exit 1
+          }
+
+          Write-Host 'The coverage settings keep compiler-generated code in the measurement.'
+
+      - name: Restore
+        run: |
+          $solution = @($env:SOLUTION | Where-Object { $_ })
+          dotnet restore @solution
+
+      - name: Verify formatting
+        if: inputs.verify-format
+        run: |
+          $solution = @($env:SOLUTION | Where-Object { $_ })
+          dotnet format @solution --verify-no-changes --no-restore
+
+      - name: Build
+        run: |
+          $solution = @($env:SOLUTION | Where-Object { $_ })
+          dotnet build @solution --configuration Release --no-restore
+
+      - name: Test
+        id: test
+        run: |
+          $solution = @($env:SOLUTION | Where-Object { $_ })
+          $settings = @()
+          if ($env:RUNSETTINGS) {
+              $settings = @('--settings', $env:RUNSETTINGS)
+          }
+
+          $results = Join-Path $env:RUNNER_TEMP 'test-results'
+          dotnet test @solution --configuration Release --no-build --logger trx --results-directory $results --collect 'XPlat Code Coverage' @settings
+
+      # From here on the steps also run after failing tests, because a failing
+      # run is when the reports matter. They do not run after a failed restore,
+      # format check or build: there is nothing to report on then.
+      - name: Merge the coverage reports
+        if: ${{ !cancelled() && steps.test.conclusion != 'skipped' }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          $tools = Join-Path $env:RUNNER_TEMP 'tools'
+          $results = Join-Path $env:RUNNER_TEMP 'test-results'
+          $coverage = Join-Path $env:RUNNER_TEMP 'coverage'
+
+          dotnet tool install dotnet-reportgenerator-globaltool --version $env:REPORTGENERATOR_VERSION --tool-path $tools
+          & (Join-Path $tools 'reportgenerator') "-reports:$results/**/coverage.cobertura.xml" "-targetdir:$coverage" '-reporttypes:Cobertura;Html'
+
+      - name: Enforce the coverage minimum
+        if: ${{ !cancelled() && steps.test.conclusion != 'skipped' }}
+        env:
+          REPORT_PATH: ${{ runner.temp }}/coverage/Cobertura.xml
+          MINIMUM: ${{ inputs.minimum-line-coverage }}
+          REQUIRED_ASSEMBLIES: ${{ inputs.required-assemblies }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+
+          $invariant = [cultureinfo]::InvariantCulture
+          $minimum = [double]::Parse($env:MINIMUM, $invariant)
+
+          if (-not (Test-Path -LiteralPath $env:REPORT_PATH -PathType Leaf)) {
+              Write-Host "::error::No merged coverage report at $env:REPORT_PATH. The test run produced no coverage files, or the merge failed."
+              exit 1
+          }
+
+          [xml] $report = Get-Content -LiteralPath $env:REPORT_PATH -Raw
+
+          # Explicit XML methods instead of dot notation: the Cobertura DOCTYPE puts
+          # a DocumentType node beside the root, and $report.coverage does not
+          # resolve past it.
+          $root = $report.DocumentElement
+
+          $rows = [System.Collections.Generic.List[object]]::new()
+          foreach ($package in $root.SelectNodes('packages/package')) {
+              $rate = [double]::Parse($package.GetAttribute('line-rate'), $invariant) * 100
+              $rows.Add([pscustomobject]@{ Name = $package.GetAttribute('name'); Rate = [math]::Round($rate, 2) })
+          }
+
+          if ($rows.Count -eq 0) {
+              Write-Host "::error::The coverage report lists no assemblies. No test project collected coverage."
+              exit 1
+          }
+
+          $total = [math]::Round([double]::Parse($root.GetAttribute('line-rate'), $invariant) * 100, 2)
+          $rows = @($rows | Sort-Object Rate, Name)
+          $rows += [pscustomobject]@{ Name = 'TOTAL'; Rate = $total }
+
+          $minimumText = $minimum.ToString('0.##', $invariant)
+          $failures = [System.Collections.Generic.List[string]]::new()
+          $summary = [System.Collections.Generic.List[string]]::new()
+          $summary.Add("### Line coverage, minimum $minimumText %")
+          $summary.Add('')
+          $summary.Add('| Result | Assembly | Line rate |')
+          $summary.Add('|---|---|---:|')
+
+          Write-Host 'Line coverage'
+          Write-Host '-------------'
+          foreach ($row in $rows) {
+              $rate = $row.Rate.ToString('0.00', $invariant)
+              $mark = 'ok'
+
+              # A rate that is not a number compares as "not below the minimum", so
+              # it is rejected by name instead of slipping through.
+              if ([double]::IsNaN($row.Rate)) {
+                  $mark = 'FAIL'
+                  $failures.Add("$($row.Name) has no line rate in the report.")
+              }
+              elseif ($row.Rate -lt $minimum) {
+                  $mark = 'FAIL'
+                  $failures.Add("$($row.Name) is at $rate %, below the required $minimumText %.")
+              }
+
+              Write-Host ('{0,-4}  {1,-48} {2,7} %' -f $mark, $row.Name, $rate)
+              $summary.Add("| $mark | $($row.Name) | $rate % |")
+          }
+
+          $required = @($env:REQUIRED_ASSEMBLIES -split '[\s,;]+' | Where-Object { $_ })
+          $present = @($rows | ForEach-Object { $_.Name })
+          foreach ($name in $required) {
+              if ($present -cnotcontains $name) {
+                  $failures.Add("$name is missing from the coverage report. No test project loads it, so none of its lines were measured.")
+                  Write-Host ('{0,-4}  {1,-48} {2,7}' -f 'FAIL', $name, 'missing')
+                  $summary.Add("| FAIL | $name | missing |")
+              }
+          }
+
+          if ($env:GITHUB_STEP_SUMMARY) {
+              $summary -join "`n" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          }
+
+          if ($failures.Count -gt 0) {
+              foreach ($failure in $failures) {
+                  Write-Host "::error title=Coverage check::$failure"
+              }
+              exit 1
+          }
+
+          Write-Host ''
+          Write-Host "The total and every assembly are at or above $minimumText %."
+
+      - name: Upload the test results
+        if: ${{ !cancelled() && steps.test.conclusion != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: ${{ runner.temp }}/test-results/**/*.trx
+          if-no-files-found: warn
+
+      - name: Upload the coverage report
+        if: ${{ !cancelled() && steps.test.conclusion != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-report
+          path: ${{ runner.temp }}/coverage
+          if-no-files-found: warn
