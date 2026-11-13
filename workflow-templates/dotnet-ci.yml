@@ -1,0 +1,31 @@
+# Builds and tests the .NET solution in Release and enforces a minimum line
+# coverage for the total and for every assembly.
+#
+# Without inputs the workflow uses the single solution in the repository root,
+# the SDK from global.json, a minimum of 90 % and an Ubuntu runner. The test
+# projects must reference coverlet.collector.
+#
+# The check appears as "dotnet / Build, test and coverage". Add that name to
+# the ruleset of the default branch after the first run.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [$default-branch]
+
+permissions:
+  contents: read
+
+jobs:
+  dotnet:
+    uses: IT-Titans/.github/.github/workflows/dotnet-ci.yml@27d942cfc27f98756b5ea28dcfc13999119ad5df # v1.0.0
+    # Remove the comment marks from the inputs the repository needs.
+    # with:
+    #   solution: src/Example.sln
+    #   runsettings: coverage.runsettings
+    #   minimum-line-coverage: 90
+    #   required-assemblies: Example.Core Example.Ui
+    #   runs-on: windows-latest
+    #   fetch-depth: 0

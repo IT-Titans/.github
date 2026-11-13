@@ -347,6 +347,28 @@ try {
             -Passed ($interpolated.Count -eq 0) -Detail ($interpolated -join '; ')
     }
 
+    # Every starter has a metadata file that parses and carries the two required
+    # keys. GitHub does not offer a starter whose metadata it cannot read.
+    $templates = Join-Path $repository 'workflow-templates'
+    foreach ($starter in @(Get-ChildItem -LiteralPath $templates -Filter '*.yml' -ErrorAction SilentlyContinue)) {
+        $metadata = Join-Path $templates ($starter.BaseName + '.properties.json')
+        $valid = $false
+        $detail = 'metadata file missing'
+
+        if (Test-Path -LiteralPath $metadata -PathType Leaf) {
+            try {
+                $parsed = Get-Content -LiteralPath $metadata -Raw | ConvertFrom-Json -AsHashtable
+                $valid = [bool] $parsed['name'] -and [bool] $parsed['description']
+                $detail = 'name or description missing'
+            }
+            catch {
+                $detail = $_.Exception.Message
+            }
+        }
+
+        Add-Result -Group 'files' -Case "workflow-templates/$($starter.Name) has readable metadata" -Passed $valid -Detail $detail
+    }
+
     # The pull request template must not contain text that could satisfy a check
     # on its own: no issue reference, no closing keyword, no ticked box, no
     # line shaped like a Conventional Commit.

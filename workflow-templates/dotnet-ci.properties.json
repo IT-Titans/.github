@@ -1,0 +1,14 @@
+{
+    "name": ".NET CI with coverage minimum",
+    "description": "Restores, checks formatting, builds and tests a .NET solution in Release and enforces a minimum line coverage for the total and for every assembly.",
+    "iconName": "octicon checklist",
+    "categories": [
+        "Continuous integration",
+        "C#"
+    ],
+    "filePatterns": [
+        "\\.slnx?$",
+        "\\.csproj$",
+        "^global\\.json$"
+    ]
+}

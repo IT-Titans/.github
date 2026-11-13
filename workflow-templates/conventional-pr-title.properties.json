@@ -1,0 +1,8 @@
+{
+    "name": "Conventional pull request title",
+    "description": "Fails a pull request whose title is not a Conventional Commit. The squash commit takes the title of the pull request.",
+    "iconName": "octicon git-pull-request",
+    "categories": [
+        "Automation"
+    ]
+}
