@@ -21,6 +21,7 @@ of the organization, so they go through a pull request.
 | `.github/workflows/conventional-pr-title.yml` | Reusable workflow: the title of a pull request must be a Conventional Commit. |
 | `.github/workflows/dotnet-ci.yml` | Reusable workflow: build and test a .NET solution and enforce a minimum line coverage for the total and for every assembly. |
 | `.github/workflows/ci.yml` | CI of this repository. |
+| `.github/dependabot.yml` | Keeps the pinned actions of this repository current. Not inherited by other repositories. |
 | `workflow-templates/` | Starters that call the two reusable workflows. They appear under **Actions > New workflow** in every repository of the organization. |
 | `docs/repository-standard.md` | The rules every public repository follows, with the reason for each. |
 | `tests/` | Tests for the scripts inside the reusable workflows. |
