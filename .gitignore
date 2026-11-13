@@ -1,0 +1,12 @@
+# Editor and operating system files
+.vs/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Scratch output of tests/Test-WorkflowScripts.ps1
+tests/out/
