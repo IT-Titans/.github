@@ -1,0 +1,14 @@
+# Template chooser for every repository of the organization that has no
+# .github/ISSUE_TEMPLATE folder of its own.
+#
+# A contact link needs an absolute URL, and this one file serves all
+# repositories. It therefore cannot point at the advisory form of the repository
+# the reader is in. It points at the organization's security policy, which
+# describes the way to that form. A repository that wants the direct link
+# carries its own ISSUE_TEMPLATE folder; it then has to carry the issue forms
+# as well, because a repository's own folder replaces this one completely.
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/IT-Titans/.github/blob/main/SECURITY.md
+    about: Never in a public issue. Use private vulnerability reporting under the Security tab of the affected repository, as the security policy describes.

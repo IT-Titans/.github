@@ -1,0 +1,47 @@
+name: Bug report
+description: Something does not work the way the README or the documentation says.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report a security vulnerability here. Follow the security policy under the **Security** tab of this repository.
+
+        Check the **Status** line in the README first. A repository of the class "frozen" is not developed further.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The shortest sequence of commands or actions that shows the problem.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release tag or the commit hash you used.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system and the versions of the tools involved, such as the .NET SDK, Node.js or Docker.
+    validations:
+      required: false
+  - type: textarea
+    id: output
+    attributes:
+      label: Logs or output
+      description: The relevant output. Remove credentials and personal data before you paste it.
+      render: text
+    validations:
+      required: false
