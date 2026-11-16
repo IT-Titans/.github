@@ -29,6 +29,7 @@ Tools under active development whose build output people use.
 | Repository | What it is |
 |---|---|
 | [PrivacyScanner](https://github.com/IT-Titans/PrivacyScanner) | Scans files for personal and sensitive data using configurable regex patterns and optional SpaCy NLP. A training project of our apprentices. Its results are a starting point for manual review, not certified GDPR compliance. |
+| [titans-vault-sync](https://github.com/IT-Titans/titans-vault-sync) | Web tool that transfers secrets from one Azure Key Vault to another. |
 
 ### Frozen
 
@@ -40,13 +41,12 @@ Examples, comparisons and proofs of concept. They are not developed further.
 | [comparison-valkey-sample](https://github.com/IT-Titans/comparison-valkey-sample) | A brief example that illustrates similarities and differences between Valkey and Redis. |
 | [elastic-kibana-example](https://github.com/IT-Titans/elastic-kibana-example) | Minimal Docker Compose setup for running Elasticsearch and Kibana locally. Demonstration material, not hardened for production use. |
 | [poc-react-logging](https://github.com/IT-Titans/poc-react-logging) | Proof of concept of a logger with two transport paths from the browser, built with React and Express. |
-| [titans-vault-sync](https://github.com/IT-Titans/titans-vault-sync) | Web tool that transfers secrets from one Azure Key Vault to another. |
 
 ### Forks
 
 | Repository | What it is |
 |---|---|
-| [mcp-victoriametrics](https://github.com/IT-Titans/mcp-victoriametrics) | Fork of [VictoriaMetrics/mcp-victoriametrics](https://github.com/VictoriaMetrics/mcp-victoriametrics), a Model Context Protocol server for VictoriaMetrics. It carries no changes of our own. |
+| [mcp-victoriametrics](https://github.com/IT-Titans/mcp-victoriametrics) | Fork of [VictoriaMetrics/mcp-victoriametrics](https://github.com/VictoriaMetrics/mcp-victoriametrics), a Model Context Protocol server for VictoriaMetrics. It carries no changes of our own and is archived. |
 
 ## Reporting a vulnerability
 
