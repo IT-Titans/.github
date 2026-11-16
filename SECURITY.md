@@ -28,9 +28,9 @@ helps, but a clear description is enough to start.
 
 | Step | Our commitment |
 |---|---|
-| Acknowledgement | within 3 working days |
-| Initial assessment | within 10 working days |
-| Progress updates | at least every 14 days while we work on the report |
+| Acknowledgement | within 5 working days |
+| Initial assessment | within 15 working days |
+| Progress updates | at least every 30 days while we work on the report |
 
 We tell you how we assess the report and what we intend to do. If we do not
 consider something a vulnerability, we say so and explain why.
